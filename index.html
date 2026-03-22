@@ -1,0 +1,752 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>Electric Transformer</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box;}
+html,body{width:100%;height:100%;overflow:hidden;background:#07090d;color:#c0ccd8;font-family:Courier,monospace;}
+body{display:flex;flex-direction:column;}
+#top{flex-shrink:0;display:flex;align-items:center;justify-content:space-between;
+  padding:5px 12px;background:#0d1018;border-bottom:1px solid #1a2434;}
+#top h1{font-size:15px;color:#f5c400;letter-spacing:.15em;text-shadow:0 0 12px #f5c40055;}
+.stats{display:flex;gap:14px;}
+.s .l{font-size:8px;color:#506070;text-transform:uppercase;letter-spacing:.1em;}
+.s .v{font-size:15px;color:#f5c400;font-weight:bold;}
+#wrap{flex:1;display:flex;justify-content:center;align-items:center;overflow:hidden;}
+#cv{display:block;}
+#bot{flex-shrink:0;padding:7px 10px 10px;background:#0d1018;border-top:1px solid #1a2434;}
+.row{display:flex;justify-content:center;align-items:center;gap:10px;}
+.btn{background:#0d1018;border:2px solid #1e2e40;border-radius:8px;color:#6080a0;
+  font-family:Courier,monospace;cursor:pointer;user-select:none;
+  -webkit-tap-highlight-color:transparent;
+  display:flex;align-items:center;justify-content:center;transition:all .07s;}
+.btn:active{background:#1a2434;color:#f5c400;border-color:#f5c400;transform:scale(.9);}
+.big{font-size:22px;width:62px;height:54px;}
+.drop{font-size:13px;font-weight:bold;width:170px;height:54px;
+  background:#f5c400;color:#000;border-color:#f5c400;letter-spacing:.05em;}
+.drop:active{background:#e6b800;transform:scale(.92);}
+#ov{position:fixed;inset:0;background:rgba(5,7,10,.93);display:flex;
+  align-items:center;justify-content:center;z-index:99;}
+.ob{background:#0d1018;border:2px solid #f5c400;border-radius:10px;
+  padding:22px 28px;text-align:center;width:min(340px,92vw);
+  box-shadow:0 0 40px #f5c40022;}
+.ob h2{color:#f5c400;font-size:18px;margin-bottom:10px;letter-spacing:.1em;}
+.ob p{color:#607080;font-size:12px;line-height:1.9;margin-bottom:14px;}
+.rules{margin:10px 0;text-align:left;}
+.r{display:flex;align-items:center;gap:9px;margin:7px 0;font-size:12px;color:#a0b4c4;}
+.rd{width:14px;height:14px;border-radius:3px;flex-shrink:0;}
+.go{background:#f5c400;color:#000;border:none;border-radius:6px;
+  padding:12px 28px;font-family:Courier,monospace;font-size:13px;
+  font-weight:bold;cursor:pointer;letter-spacing:.07em;}
+.go:hover{background:#ffe040;}
+</style>
+</head>
+<body>
+<div id="top">
+  <h1>⚡ ELECTRIC TRANSFORMER</h1>
+  <div class="stats">
+    <div class="s"><div class="l">Счёт</div><div class="v" id="sc">0</div></div>
+    <div class="s"><div class="l">Уровень</div><div class="v" id="lv">1</div></div>
+    <div class="s"><div class="l">Матчи</div><div class="v" id="mt">0</div></div>
+  </div>
+</div>
+<div id="wrap"><canvas id="cv"></canvas></div>
+<div id="bot">
+  <div class="row">
+    <button class="btn big" id="bl">&#9664;</button>
+    <button class="btn drop" id="bd">&#9660;&#9660;&nbsp;БРОСИТЬ</button>
+    <button class="btn big" id="br">&#9654;</button>
+  </div>
+</div>
+<div id="ov">
+  <div class="ob">
+    <h2>⚡ ELECTRIC TRANSFORMER</h2>
+    <p>◀ ▶ — сдвинуть &nbsp;|&nbsp; ▼▼ — бросить<br>3 одинаковых подряд — исчезают!</p>
+    <button class="go" id="go">&#9654; START</button>
+  </div>
+</div>
+<script>
+// ══════════════════════════════════════════
+//  ВСПОМОГАТЕЛЬНЫЕ
+// ══════════════════════════════════════════
+function mkC(w,h,fn){var c=document.createElement('canvas');c.width=w;c.height=h;fn(c.getContext('2d'),w,h);return c;}
+function rr(g,x,y,w,h,r){g.beginPath();g.moveTo(x+r,y);g.lineTo(x+w-r,y);g.quadraticCurveTo(x+w,y,x+w,y+r);g.lineTo(x+w,y+h-r);g.quadraticCurveTo(x+w,y+h,x+w-r,y+h);g.lineTo(x+r,y+h);g.quadraticCurveTo(x,y+h,x,y+h-r);g.lineTo(x,y+r);g.quadraticCurveTo(x,y,x+r,y);g.closePath();}
+
+// ══════════════════════════════════════════
+//  СПРАЙТЫ
+// ══════════════════════════════════════════
+
+// СУ — 2×4 (высокий прямоугольник, соотношение 1:2)
+function sprCU(g,W,H){
+  // Корпус
+  var gr=g.createLinearGradient(0,0,W,0);
+  gr.addColorStop(0,'#98aab4');gr.addColorStop(.4,'#ccd8e0');gr.addColorStop(1,'#8899a4');
+  g.fillStyle=gr; rr(g,3,3,W-6,H-6,6); g.fill();
+
+  // Верхняя панель (25% высоты)
+  var ph=H*.25;
+  gr=g.createLinearGradient(0,3,0,ph+3);
+  gr.addColorStop(0,'#5a6870');gr.addColorStop(1,'#405060');
+  g.fillStyle=gr; g.fillRect(5,5,W-10,ph);
+
+  // Дисплей на панели (без надписи)
+  g.fillStyle='#0b1810'; g.fillRect(W*.08,H*.022,W*.84,H*.09);
+  // LED индикаторы на дисплее
+  g.fillStyle='#00e820';g.fillRect(W*.15,H*.04,W*.12,H*.04);
+  g.fillStyle='#00a010';g.fillRect(W*.35,H*.04,W*.12,H*.04);
+  g.fillStyle='#004008';g.fillRect(W*.55,H*.04,W*.12,H*.04);
+
+  // 3 лампочки: красная, жёлтая, зелёная
+  var bc=['#d01808','#d89010','#10983a'];
+  for(var i=0;i<3;i++){
+    var bx=W*(.22+i*.28), by=H*.185;
+    g.fillStyle=bc[i];
+    g.beginPath();g.arc(bx,by,W*.075,0,Math.PI*2);g.fill();
+    // блик
+    g.fillStyle='rgba(255,255,255,.35)';
+    g.beginPath();g.arc(bx-W*.025,by-H*.012,W*.026,0,Math.PI*2);g.fill();
+    // ободок
+    g.strokeStyle='rgba(0,0,0,.3)';g.lineWidth=1;
+    g.beginPath();g.arc(bx,by,W*.075,0,Math.PI*2);g.stroke();
+  }
+
+  // Разделительная черта (дверь)
+  g.strokeStyle='#6a8090';g.lineWidth=1.5;
+  g.beginPath();g.moveTo(W/2,ph+8);g.lineTo(W/2,H*.9);g.stroke();
+
+  // Горизонтальный разделитель (середина двери)
+  g.strokeStyle='#7a9098';g.lineWidth=1;
+  g.beginPath();g.moveTo(W*.06,H*.55);g.lineTo(W*.94,H*.55);g.stroke();
+
+  // Предупреждающий знак (верхняя дверь)
+  var ty=H*.38,tx=W/2;
+  g.fillStyle='#f5c400';
+  g.beginPath();g.moveTo(tx,ty-H*.055);g.lineTo(tx+W*.2,ty+H*.04);g.lineTo(tx-W*.2,ty+H*.04);g.closePath();g.fill();
+  g.strokeStyle='#a08000';g.lineWidth=1.2;g.stroke();
+  g.fillStyle='#1a1000';g.font='bold '+Math.round(H*.065)+'px Arial';
+  g.fillText('!',tx,ty+H*.03);
+
+  // Шильдик (верхняя дверь) — без текста
+  g.fillStyle='rgba(255,255,255,.1)';g.fillRect(W*.07,H*.43,W*.4,H*.1);
+  g.strokeStyle='rgba(180,200,210,.25)';g.lineWidth=.7;g.strokeRect(W*.07,H*.43,W*.4,H*.1);
+
+  // Нижняя дверь — вентиляционные жалюзи
+  g.strokeStyle='#7a98a8';g.lineWidth=1.1;
+  for(var j=0;j<10;j++){
+    var sy=H*(.57+j*.03);
+    g.beginPath();g.moveTo(W*.07,sy);g.lineTo(W*.93,sy);g.stroke();
+    g.strokeStyle='rgba(255,255,255,.08)';g.lineWidth=.5;
+    g.beginPath();g.moveTo(W*.07,sy+.8);g.lineTo(W*.93,sy+.8);g.stroke();
+    g.strokeStyle='#7a98a8';g.lineWidth=1.1;
+  }
+
+  // Ручка-замок (правая дверь)
+  g.fillStyle='#4a5e6a';g.fillRect(W*.52,H*.7,W*.07,H*.08);
+  g.fillStyle='#384858';g.fillRect(W*.535,H*.72,W*.04,H*.05);
+
+  // Ножки
+  g.fillStyle='#586870';
+  g.fillRect(W*.06,H*.94,W*.24,H*.05); g.fillRect(W*.7,H*.94,W*.24,H*.05);
+
+  // Обводка
+  g.strokeStyle='#506070';g.lineWidth=2.5; rr(g,3,3,W-6,H-6,6);g.stroke();
+  g.strokeStyle='rgba(255,255,255,.14)';g.lineWidth=1; rr(g,5,5,W-10,H-10,4);g.stroke();
+}
+
+// ТРАНСФОРМАТОР — 3×3 (квадрат)
+function sprTR(g,W,H){
+  g.fillStyle='rgba(0,0,0,.18)';g.beginPath();g.ellipse(W*.5,H*.93,W*.42,H*.035,0,0,Math.PI*2);g.fill();
+
+  // Лапы
+  g.fillStyle='#8a9298';g.fillRect(W*.04,H*.85,W*.3,H*.065);g.fillRect(W*.66,H*.85,W*.3,H*.065);
+  g.fillStyle='#787e84';g.fillRect(W*.05,H*.88,W*.28,H*.04);g.fillRect(W*.67,H*.88,W*.28,H*.04);
+
+  // Основной бак
+  var bX=W*.08,bY=H*.3,bW=W*.74,bH=H*.57;
+  var bg=g.createLinearGradient(bX,0,bX+bW,0);
+  bg.addColorStop(0,'#88909a');bg.addColorStop(.15,'#bcccd6');bg.addColorStop(.45,'#d8eaf4');bg.addColorStop(.7,'#b0c0ca');bg.addColorStop(1,'#788088');
+  g.fillStyle=bg; rr(g,bX,bY,bW,bH,W*.06); g.fill();
+  g.strokeStyle='#687080';g.lineWidth=2; rr(g,bX,bY,bW,bH,W*.06); g.stroke();
+
+  // Крышка
+  bg=g.createLinearGradient(bX,bY-H*.05,bX,bY+H*.03);bg.addColorStop(0,'#a8b4be');bg.addColorStop(1,'#d0dce4');
+  g.fillStyle=bg; rr(g,bX-W*.02,bY-H*.04,bW+W*.04,H*.07,W*.02); g.fill();
+  g.strokeStyle='#687080';g.lineWidth=1.5; rr(g,bX-W*.02,bY-H*.04,bW+W*.04,H*.07,W*.02); g.stroke();
+
+  // Болты крышки
+  for(var i=0;i<8;i++){var bx=bX+W*.05+i*(bW-W*.08)/7;g.fillStyle='#788090';g.beginPath();g.arc(bx,bY-.5,W*.016,0,Math.PI*2);g.fill();}
+
+  // Расширительный бак
+  var rX=bX-W*.01,rY=H*.07,rW=W*.42,rH=H*.22;
+  bg=g.createLinearGradient(rX,rY,rX,rY+rH);bg.addColorStop(0,'#c8d8e0');bg.addColorStop(.5,'#e4f0f8');bg.addColorStop(1,'#98a8b0');
+  g.fillStyle=bg; rr(g,rX,rY,rW,rH,rH/2); g.fill();
+  g.strokeStyle='#687080';g.lineWidth=1.8; rr(g,rX,rY,rW,rH,rH/2); g.stroke();
+
+  // Маслоуказатель
+  g.fillStyle='rgba(160,210,255,.3)';g.fillRect(rX+rW*.57,rY+rH*.1,rW*.08,rH*.8);
+  g.fillStyle='#3888bc';g.fillRect(rX+rW*.57,rY+rH*.45,rW*.08,rH*.45);
+
+  // Сигнализатор
+  g.fillStyle='#1880cc';g.beginPath();g.arc(rX+rW*.17,rY-H*.022,W*.03,0,Math.PI*2);g.fill();
+  g.fillStyle='rgba(255,255,255,.45)';g.beginPath();g.arc(rX+rW*.158,rY-H*.028,W*.011,0,Math.PI*2);g.fill();
+
+  // Переходник расш → бак
+  g.fillStyle='#8a9298';g.fillRect(bX+bW*.36,rY+rH,W*.1,bY-rY-rH);
+
+  // Радиатор (правая сторона)
+  var radX=bX+bW+W*.01,radY=bY+H*.07,radW=W*.11,radH=bH*.7;
+  g.fillStyle='#aab8c2';g.fillRect(radX,radY,radW,radH);
+  g.strokeStyle='#8a9298';g.lineWidth=1.1;
+  for(var j=0;j<=7;j++){var y=radY+j*(radH/7);g.beginPath();g.moveTo(radX-1,y);g.lineTo(radX+radW+1,y);g.stroke();}
+  for(var k=1;k<=3;k++){var x=radX+k*(radW/4);g.beginPath();g.moveTo(x,radY);g.lineTo(x,radY+radH);g.stroke();}
+
+  // Шильдик — без текста
+  g.fillStyle='rgba(255,255,255,.14)';g.fillRect(bX+W*.12,bY+H*.22,W*.38,H*.22);
+  g.strokeStyle='rgba(160,180,200,.2)';g.lineWidth=.6;g.strokeRect(bX+W*.12,bY+H*.22,W*.38,H*.22);
+
+  // Цепь
+  g.strokeStyle='#6a7278';g.lineWidth=1.5;g.setLineDash([3,2]);
+  g.beginPath();g.moveTo(bX+bW*.3,bY+H*.05);g.lineTo(bX+bW*.3,bY+H*.22);g.stroke();
+  g.setLineDash([]);
+
+  // Выводы ВН
+  [[bX+bW*.22,bY+H*.01],[bX+bW*.5,bY+H*.01]].forEach(function(p){
+    g.fillStyle='#c8d4dc';g.fillRect(p[0],p[1],W*.07,H*.042);
+    g.strokeStyle='#8a9298';g.lineWidth=1;g.strokeRect(p[0],p[1],W*.07,H*.042);
+  });
+}
+
+// ФИЛЬТР — 2×3 (прямоугольник, чуть пониже СУ)
+function sprFL(g,W,H){
+  // Козырёк
+  var bg=g.createLinearGradient(0,0,0,H*.09);bg.addColorStop(0,'#a0b0ba');bg.addColorStop(1,'#c0ccd4');
+  g.fillStyle=bg;g.fillRect(-W*.04,0,W*1.08,H*.08);g.fillStyle='#8a9298';g.fillRect(0,H*.073,W,H*.016);
+
+  // Стойки рамы
+  g.fillStyle='#78889a';
+  g.fillRect(0,H*.089,W*.065,H*.79);g.fillRect(W*.935,H*.089,W*.065,H*.79);
+  g.fillRect(0,H*.089,W,H*.025);
+
+  // Средний разделитель
+  g.fillStyle='#8a9298';g.fillRect(0,H*.42,W,H*.022);
+
+  // Фон корпуса
+  bg=g.createLinearGradient(0,H*.1,W,H*.1);bg.addColorStop(0,'#b0bcc4');bg.addColorStop(.5,'#d0dce4');bg.addColorStop(1,'#a0b0b8');
+  g.fillStyle=bg;g.fillRect(W*.065,H*.114,W*.87,H*.755);
+
+  // Верхняя секция — жалюзи вентиляции
+  g.fillStyle='rgba(185,210,230,.18)';g.fillRect(W*.09,H*.135,W*.82,H*.26);
+  g.strokeStyle='rgba(130,160,180,.5)';g.lineWidth=.9;
+  for(var i=0;i<8;i++){var sy=H*(.145+i*.031);g.beginPath();g.moveTo(W*.1,sy);g.lineTo(W*.9,sy);g.stroke();}
+
+  // Нижняя дверь
+  var dx=W*.09,dy=H*.445,dw=W*.82,dh=H*.42;
+  bg=g.createLinearGradient(dx,0,dx+dw,0);bg.addColorStop(0,'#a8b8c0');bg.addColorStop(.35,'#ccdae2');bg.addColorStop(1,'#98a8b0');
+  g.fillStyle=bg;g.fillRect(dx,dy,dw,dh);g.strokeStyle='#78909a';g.lineWidth=1.3;g.strokeRect(dx,dy,dw,dh);
+  g.strokeStyle='#8a9298';g.lineWidth=1;g.beginPath();g.moveTo(W*.5,dy);g.lineTo(W*.5,dy+dh);g.stroke();
+
+  // Предупреждающий знак
+  var ty=dy+dh*.25,tx=W*.5;
+  g.fillStyle='#f5c400';g.beginPath();g.moveTo(tx,ty-H*.072);g.lineTo(tx+W*.18,ty+H*.052);g.lineTo(tx-W*.18,ty+H*.052);g.closePath();g.fill();
+  g.strokeStyle='#a08000';g.lineWidth=1.2;g.stroke();
+  g.fillStyle='#1a1000';g.font='bold '+Math.round(H*.09)+'px Arial';g.textAlign='center';g.fillText('!',tx,ty+H*.035);
+
+  // (надписи убраны)
+
+  // Замок
+  g.fillStyle='#586878';g.fillRect(W*.51,dy+dh*.76,W*.055,H*.055);
+  g.fillStyle='#8090a0';g.beginPath();g.arc(W*.537,dy+dh*.76,W*.022,Math.PI,0);g.fill();
+  g.fillStyle='#445058';g.fillRect(W*.52,dy+dh*.775,W*.034,H*.034);
+
+  // Ножки
+  g.fillStyle='#78889a';g.fillRect(W*.07,H*.875,W*.13,H*.1);g.fillRect(W*.8,H*.875,W*.13,H*.1);
+  g.fillStyle='#687080';g.fillRect(W*.09,H*.93,W*.82,H*.04);
+
+  // Обводка
+  g.strokeStyle='#587080';g.lineWidth=1.8;g.strokeRect(W*.065,H*.089,W*.87,H*.781);
+  g.strokeStyle='rgba(255,255,255,.1)';g.lineWidth=.8;
+  g.beginPath();g.moveTo(W*.075,H*.1);g.lineTo(W*.075,H*.86);g.stroke();
+}
+
+// ══════════════════════════════════════════
+//  ОПРЕДЕЛЕНИЯ ПРЕДМЕТОВ
+//  w, h — размер в клетках сетки
+// ══════════════════════════════════════════
+var PDEFS = {
+  1: {name:'СУ',           w:2, h:4, color:'#e07030'},
+  2: {name:'Трансформатор',w:3, h:3, color:'#4da6ff'},
+  3: {name:'Фильтр',       w:2, h:3, color:'#00c97a'}
+};
+var RES = 100; // базовый пиксель на клетку для спрайта
+var SPR = {
+  1: mkC(2*RES, 4*RES, sprCU),
+  2: mkC(3*RES, 3*RES, sprTR),
+  3: mkC(2*RES, 3*RES, sprFL)
+};
+
+// ══════════════════════════════════════════
+//  CANVAS И РАЗМЕРЫ
+// ══════════════════════════════════════════
+var COLS = 8;
+var ROWS, CELL;
+var cv = document.getElementById('cv');
+var cx = cv.getContext('2d');
+
+function resize(){
+  var wrap = document.getElementById('wrap');
+  var wW = wrap.clientWidth, wH = wrap.clientHeight;
+  CELL = Math.floor(Math.min(wW/COLS, wH/12, 68));
+  ROWS = Math.floor(wH / CELL);
+  cv.width  = COLS * CELL;
+  cv.height = ROWS * CELL;
+}
+
+// ══════════════════════════════════════════
+//  ИГРОВОЕ СОСТОЯНИЕ
+// ══════════════════════════════════════════
+// board[r][c] = pieceId или 0
+// pieces = [{id, type, col, row}]  w/h берётся из PDEFS
+var board, pieces, nextId;
+var score, level, matchCount;
+var cur;       // падающий предмет {type, col, row}
+var busy, over, paused, ticker;
+
+function init(){
+  board = [];
+  for(var i=0;i<60;i++){var row=[];for(var j=0;j<COLS;j++)row.push(0);board.push(row);}
+  pieces = []; nextId = 1;
+  score=0; level=1; matchCount=0;
+  busy=false; over=false; paused=false;
+  setUI();
+  if(ticker) clearInterval(ticker);
+  spawn();
+  ticker = setInterval(tick, spd());
+}
+
+function spd(){ return Math.max(120, 700 - (level-1)*70); }
+function rndType(){ return Math.floor(Math.random()*3)+1; }
+
+// ══════════════════════════════════════════
+//  СПАВН
+// ══════════════════════════════════════════
+function spawn(){
+  var type = rndType();
+  var pd = PDEFS[type];
+  var col = Math.floor((COLS - pd.w) / 2);
+  cur = {type:type, col:col, row:0};
+  if(!canPlace(cur.type, cur.col, cur.row)){ gameOver(); return; }
+  sndSpawn();
+  draw();
+}
+
+// ══════════════════════════════════════════
+//  КОЛЛИЗИИ
+// ══════════════════════════════════════════
+function canPlace(type, col, row){
+  var pd = PDEFS[type];
+  for(var r=row; r<row+pd.h; r++){
+    for(var c=col; c<col+pd.w; c++){
+      if(c<0||c>=COLS) return false;
+      if(r<0) continue;
+      if(r>=ROWS) return false;
+      if(board[r][c]!==0) return false;
+    }
+  }
+  return true;
+}
+
+// ══════════════════════════════════════════
+//  ТИК
+// ══════════════════════════════════════════
+function tick(){
+  if(paused||over||busy) return;
+  if(canPlace(cur.type, cur.col, cur.row+1)){
+    cur.row++;
+    draw();
+  } else {
+    place();
+  }
+}
+
+// ══════════════════════════════════════════
+//  УКЛАДКА
+// ══════════════════════════════════════════
+function place(){
+  busy = true;
+  sndLand();
+  var id = nextId++;
+  var pd = PDEFS[cur.type];
+  pieces.push({id:id, type:cur.type, col:cur.col, row:cur.row});
+  markBoard(id, cur.type, cur.col, cur.row, true);
+  doMatches(function(){ busy=false; spawn(); });
+}
+
+function markBoard(id, type, col, row, set){
+  var pd = PDEFS[type];
+  for(var r=row; r<row+pd.h; r++)
+    for(var c=col; c<col+pd.w; c++)
+      if(r>=0&&r<ROWS&&c>=0&&c<COLS) board[r][c] = set ? id : 0;
+}
+
+// ══════════════════════════════════════════
+//  СОВПАДЕНИЯ  (3 одинаковых подряд вертикально
+//  в одной и той же позиции col)
+// ══════════════════════════════════════════
+function doMatches(cb){
+  var toRemove = findMatches();
+  if(!toRemove.length){ cb(); return; }
+  sndMatch();
+
+  // Очки
+  score += toRemove.length * 80 * level;
+  matchCount += Math.floor(toRemove.length / 3);
+  level = Math.floor(matchCount / 5) + 1;
+  clearInterval(ticker); ticker = setInterval(tick, spd());
+  setUI();
+
+  // Анимация → удаление → гравитация → рекурсия
+  var removeSet = {};
+  toRemove.forEach(function(p){ removeSet[p.id]=true; });
+  var flashList = pieces.filter(function(p){ return removeSet[p.id]; });
+
+  animFlash(flashList, function(){
+    // Удаляем с доски и из массива
+    flashList.forEach(function(p){
+      markBoard(p.id, p.type, p.col, p.row, false);
+    });
+    pieces = pieces.filter(function(p){ return !removeSet[p.id]; });
+    runGravity();
+    // Рекурсивно проверяем снова (цепочки)
+    doMatches(cb);
+  });
+}
+
+function findMatches(){
+  // Группируем по (type, col): одинаковый тип И одинаковая позиция столбца
+  var groups = {};
+  pieces.forEach(function(p){
+    var key = p.type+'_'+p.col;
+    if(!groups[key]) groups[key]=[];
+    groups[key].push(p);
+  });
+
+  var toRemove = [];
+  var marked = {};
+  Object.keys(groups).forEach(function(k){
+    var grp = groups[k].slice().sort(function(a,b){return a.row-b.row;});
+    var run = [grp[0]];
+    for(var i=1;i<grp.length;i++){
+      var prev = run[run.length-1];
+      var prevBottom = prev.row + PDEFS[prev.type].h;
+      // Стоят ВПЛОТНУЮ друг на друге?
+      if(grp[i].row === prevBottom){
+        run.push(grp[i]);
+      } else {
+        if(run.length>=3) run.forEach(function(p){if(!marked[p.id]){marked[p.id]=true;toRemove.push(p);}});
+        run=[grp[i]];
+      }
+    }
+    if(run.length>=3) run.forEach(function(p){if(!marked[p.id]){marked[p.id]=true;toRemove.push(p);}});
+  });
+  return toRemove;
+}
+
+// ══════════════════════════════════════════
+//  ГРАВИТАЦИЯ после удаления
+// ══════════════════════════════════════════
+function runGravity(){
+  var changed = true;
+  var maxIter = 50;
+  while(changed && maxIter-- > 0){
+    changed = false;
+    // Обрабатываем снизу вверх (сначала нижние)
+    var sorted = pieces.slice().sort(function(a,b){
+      return (b.row + PDEFS[b.type].h) - (a.row + PDEFS[a.type].h);
+    });
+    for(var i=0;i<sorted.length;i++){
+      var p = sorted[i];
+      var pd = PDEFS[p.type];
+      var bottomRow = p.row + pd.h;
+      if(bottomRow >= ROWS) continue;
+      // Проверяем ряд под предметом
+      var canFall = true;
+      for(var c=p.col; c<p.col+pd.w; c++){
+        if(board[bottomRow][c]!==0){canFall=false;break;}
+      }
+      if(canFall){
+        markBoard(p.id, p.type, p.col, p.row, false);
+        p.row++;
+        markBoard(p.id, p.type, p.col, p.row, true);
+        changed = true;
+      }
+    }
+  }
+}
+
+// ══════════════════════════════════════════
+//  АНИМАЦИЯ ВСПЫШКИ
+// ══════════════════════════════════════════
+function animFlash(flashList, cb){
+  var f=0, N=22;
+  function step(){
+    f++;
+    var a = 1 - f/N;
+    draw(flashList, a);
+    if(f<N) requestAnimationFrame(step);
+    else cb();
+  }
+  requestAnimationFrame(step);
+}
+
+// ══════════════════════════════════════════
+//  КОНЕЦ ИГРЫ
+// ══════════════════════════════════════════
+function gameOver(){
+  over=true; clearInterval(ticker);
+  sndGameOver();
+  var ov=document.getElementById('ov');
+  ov.style.display='flex';
+  ov.querySelector('h2').textContent='АВАРИЯ!';
+  ov.querySelector('p').innerHTML='Поле переполнено!<br>Счёт: <b style="color:#f5c400">'+score+'</b><br>Уровень '+level+' | Матчей: '+matchCount;
+  document.getElementById('go').textContent='СНОВА';
+}
+
+function setUI(){
+  document.getElementById('sc').textContent=score;
+  document.getElementById('lv').textContent=level;
+  document.getElementById('mt').textContent=matchCount;
+}
+
+// ══════════════════════════════════════════
+//  РИСОВАНИЕ
+// ══════════════════════════════════════════
+function ghostRow(){
+  var r = cur.row;
+  while(canPlace(cur.type, cur.col, r+1)) r++;
+  return r;
+}
+
+function draw(flashList, flashAlpha){
+  cx.clearRect(0,0,cv.width,cv.height);
+
+  // Сетка
+  cx.strokeStyle='rgba(255,255,255,.02)'; cx.lineWidth=.5;
+  for(var r=0;r<=ROWS;r++){cx.beginPath();cx.moveTo(0,r*CELL);cx.lineTo(COLS*CELL,r*CELL);cx.stroke();}
+  for(var c=0;c<=COLS;c++){cx.beginPath();cx.moveTo(c*CELL,0);cx.lineTo(c*CELL,ROWS*CELL);cx.stroke();}
+
+  // Подсветка столбцов падения
+  if(cur&&!over){
+    var pd=PDEFS[cur.type];
+    cx.fillStyle='rgba(255,255,255,.03)';
+    cx.fillRect(cur.col*CELL, 0, pd.w*CELL, cv.height);
+  }
+
+  // Уложенные предметы
+  var flashSet = {};
+  if(flashList) flashList.forEach(function(p){flashSet[p.id]=true;});
+
+  for(var i=0;i<pieces.length;i++){
+    var p=pieces[i];
+    var pd=PDEFS[p.type];
+    var fa = (flashSet[p.id] && flashAlpha!=null) ? flashAlpha : 1;
+    drawPiece(p.type, p.col, p.row, fa);
+  }
+
+  // Вспышка
+  if(flashList && flashAlpha!=null && flashAlpha>0){
+    for(var i=0;i<flashList.length;i++){
+      var p=flashList[i]; var pd=PDEFS[p.type];
+      cx.fillStyle=PDEFS[p.type].color+Math.round(flashAlpha*210).toString(16).padStart(2,'0');
+      cx.fillRect(p.col*CELL, p.row*CELL, pd.w*CELL, pd.h*CELL);
+      cx.strokeStyle='rgba(255,255,255,'+flashAlpha+')'; cx.lineWidth=3;
+      cx.strokeRect(p.col*CELL+1.5, p.row*CELL+1.5, pd.w*CELL-3, pd.h*CELL-3);
+    }
+  }
+
+  // Тень
+  if(cur&&!over){
+    var gr=ghostRow();
+    var pd=PDEFS[cur.type];
+    if(gr!==cur.row){
+      cx.globalAlpha=.15;
+      cx.drawImage(SPR[cur.type], cur.col*CELL, gr*CELL, pd.w*CELL, pd.h*CELL);
+      cx.globalAlpha=1;
+      cx.strokeStyle=PDEFS[cur.type].color+'55'; cx.lineWidth=2;
+      cx.setLineDash([5,3]);
+      cx.strokeRect(cur.col*CELL+1, gr*CELL+1, pd.w*CELL-2, pd.h*CELL-2);
+      cx.setLineDash([]);
+    }
+  }
+
+  // Падающий предмет
+  if(cur&&!over) drawPiece(cur.type, cur.col, cur.row, 1);
+
+  // Пауза
+  if(paused){
+    cx.fillStyle='rgba(5,7,10,.75)'; cx.fillRect(0,0,cv.width,cv.height);
+    cx.fillStyle='#f5c400';
+    cx.font='bold '+Math.round(CELL*.7)+'px Courier';
+    cx.textAlign='center';
+    cx.fillText('ПАУЗА', cv.width/2, cv.height/2);
+    cx.textAlign='left';
+  }
+}
+
+function drawPiece(type, col, row, alpha){
+  var pd=PDEFS[type];
+  // 10% отступ со всех сторон
+  var PAD = CELL * 0.10;
+  var ox = col*CELL + PAD;
+  var oy = row*CELL + PAD;
+  var pw = pd.w*CELL - PAD*2;
+  var ph = pd.h*CELL - PAD*2;
+  cx.globalAlpha=alpha;
+  cx.drawImage(SPR[type], ox, oy, pw, ph);
+  cx.strokeStyle=pd.color+'99'; cx.lineWidth=1.5;
+  cx.strokeRect(ox+.75, oy+.75, pw-1.5, ph-1.5);
+  cx.fillStyle='rgba(255,255,255,.1)';
+  cx.fillRect(ox, oy, pw, 2);
+  cx.fillRect(ox, oy, 2, ph);
+  cx.globalAlpha=1;
+}
+
+// ══════════════════════════════════════════
+//  ЗВУК — ретро чиптюн (Web Audio API)
+// ══════════════════════════════════════════
+var AC=null;
+function getAC(){
+  if(!AC) AC=new(window.AudioContext||window.webkitAudioContext)();
+  if(AC.state==='suspended') AC.resume();
+  return AC;
+}
+function beep(freq,dur,vol,type,ac,t){
+  var o=ac.createOscillator(),g=ac.createGain();
+  o.connect(g);g.connect(ac.destination);
+  o.type=type||'square';
+  o.frequency.setValueAtTime(freq,t);
+  g.gain.setValueAtTime(vol||0.15,t);
+  g.gain.exponentialRampToValueAtTime(0.001,t+dur);
+  o.start(t);o.stop(t+dur+0.01);
+}
+function sweep(f1,f2,dur,vol,type,ac,t){
+  var o=ac.createOscillator(),g=ac.createGain();
+  o.connect(g);g.connect(ac.destination);
+  o.type=type||'square';
+  o.frequency.setValueAtTime(f1,t);
+  o.frequency.linearRampToValueAtTime(f2,t+dur);
+  g.gain.setValueAtTime(vol||0.15,t);
+  g.gain.exponentialRampToValueAtTime(0.001,t+dur);
+  o.start(t);o.stop(t+dur+0.01);
+}
+function noiseHit(dur,vol,ac,t){
+  var buf=ac.createBuffer(1,Math.floor(ac.sampleRate*dur),ac.sampleRate);
+  var d=buf.getChannelData(0);
+  for(var i=0;i<d.length;i++) d[i]=(Math.random()*2-1);
+  var src=ac.createBufferSource(),g=ac.createGain();
+  var flt=ac.createBiquadFilter();flt.type='lowpass';flt.frequency.value=400;
+  src.buffer=buf;src.connect(flt);flt.connect(g);g.connect(ac.destination);
+  g.gain.setValueAtTime(vol||0.2,t);g.gain.exponentialRampToValueAtTime(0.001,t+dur);
+  src.start(t);src.stop(t+dur+0.02);
+}
+
+// Движение ◀▶ — короткий пикающий тик
+function sndMove(){
+  try{var ac=getAC(),t=ac.currentTime;beep(330,0.04,0.1,'square',ac,t);}catch(e){}
+}
+// Приземление — глухой удар
+function sndLand(){
+  try{
+    var ac=getAC(),t=ac.currentTime;
+    noiseHit(0.07,0.22,ac,t);
+    beep(110,0.1,0.18,'square',ac,t);
+  }catch(e){}
+}
+// Совпадение — восходящая аркадная мелодия
+function sndMatch(){
+  try{
+    var ac=getAC(),t=ac.currentTime;
+    var notes=[523,659,784,1047];
+    for(var i=0;i<notes.length;i++)
+      beep(notes[i],0.1,0.18,'square',ac,t+i*0.07);
+    // финальный свип вверх
+    sweep(800,1600,0.18,0.14,'square',ac,t+0.32);
+  }catch(e){}
+}
+// Бросить — падающий свип
+function sndDrop(){
+  try{
+    var ac=getAC(),t=ac.currentTime;
+    sweep(440,120,0.12,0.2,'square',ac,t);
+    noiseHit(0.06,0.15,ac,t+0.1);
+  }catch(e){}
+}
+// Конец игры — нисходящие ноты
+function sndGameOver(){
+  try{
+    var ac=getAC(),t=ac.currentTime;
+    var notes=[440,330,262,196,147];
+    for(var i=0;i<notes.length;i++)
+      beep(notes[i],0.2,0.2,'sawtooth',ac,t+i*0.15);
+  }catch(e){}
+}
+// Спавн нового предмета — лёгкий пинг
+function sndSpawn(){
+  try{
+    var ac=getAC(),t=ac.currentTime;
+    sweep(200,350,0.08,0.1,'square',ac,t);
+  }catch(e){}
+}
+
+// ══════════════════════════════════════════
+//  УПРАВЛЕНИЕ
+// ══════════════════════════════════════════
+function moveL(){
+  if(busy||over||paused||!cur) return;
+  if(canPlace(cur.type, cur.col-1, cur.row)){ cur.col--; sndMove(); draw(); }
+}
+function moveR(){
+  if(busy||over||paused||!cur) return;
+  if(canPlace(cur.type, cur.col+1, cur.row)){ cur.col++; sndMove(); draw(); }
+}
+function drop(){
+  if(busy||over||paused||!cur) return;
+  sndDrop();
+  while(canPlace(cur.type, cur.col, cur.row+1)){ cur.row++; score+=2; }
+  setUI(); place();
+}
+function togglePause(){ if(!over){ paused=!paused; draw(); } }
+
+document.getElementById('bl').addEventListener('click', moveL);
+document.getElementById('br').addEventListener('click', moveR);
+document.getElementById('bd').addEventListener('click', drop);
+
+document.addEventListener('keydown', function(e){
+  if(e.key==='ArrowLeft'){e.preventDefault();moveL();}
+  else if(e.key==='ArrowRight'){e.preventDefault();moveR();}
+  else if(e.key==='ArrowDown'||e.key===' '){e.preventDefault();drop();}
+  else if(e.key==='p'||e.key==='P') togglePause();
+});
+
+var tx,ty;
+cv.addEventListener('touchstart',function(e){tx=e.touches[0].clientX;ty=e.touches[0].clientY;e.preventDefault();},{passive:false});
+cv.addEventListener('touchend',function(e){
+  var dx=e.changedTouches[0].clientX-tx, dy=e.changedTouches[0].clientY-ty;
+  if(Math.abs(dx)>Math.abs(dy)){if(Math.abs(dx)>22){dx>0?moveR():moveL();}}
+  else if(dy>30) drop();
+  e.preventDefault();
+},{passive:false});
+
+document.getElementById('go').addEventListener('click', function(){
+  document.getElementById('ov').style.display='none';
+  resize(); init();
+});
+
+window.addEventListener('resize', function(){
+  if(!board) return;
+  resize(); draw();
+});
+</script>
+</body>
+</html>
